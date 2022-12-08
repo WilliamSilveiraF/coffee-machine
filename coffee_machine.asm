@@ -92,9 +92,9 @@ GET_COFFEE:
 	la	$t0, sugar
 	lw	$t0, ($t0) 	# $t0 storage - sugar amount
 	
-	mul	$t1, $a2, $a1  # $t1 - needed sugar amount
+	mul	$s3, $a2, $a1  # $t1 - needed sugar amount
 
-	blt	$t0, $t1, HANDLE_THERE_ISNT_SUGAR_ERROR
+	blt	$t0, $s3, HANDLE_THERE_ISNT_SUGAR_ERROR
 
 	CHECK_DRINK_TYPE_AVAILABILITY:
 	la	$s0, coffee
@@ -103,7 +103,7 @@ GET_COFFEE:
 	lw	$s0, ($s0)	# coffee
 	lw	$s1, ($s1)	# milk
 	lw	$s2, ($s2)	# chocolate
-
+				# sugar $s3
 	CHECK_PURE_COFFEE_AVAIBILITY:
 	blt	$s0, $a1, HANDLE_THERE_ISNT_COFFEE_ERROR
 	beq	$a0, 1, PREPARE
@@ -117,6 +117,12 @@ GET_COFFEE:
 	beq	$a0, 3, PREPARE
 
 	PREPARE:
+	beq	$a2, 2, PREPARECOFFEE # if don't want sugar
+	# sugar === $s3
+	la	$t0, sugar
+	sub 	$s3, $s3, $a1
+	sw	$s3, ($t0)
+
 	PREPARECOFFEE:
 	la	$t0, coffee
 	sub	$s0, $s0, $a1
