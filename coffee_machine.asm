@@ -3,12 +3,12 @@
 	milk:		.word 	2
 	chocolate:	.word	1
 	sugar: 		.word	2
-	actionOptions:	.asciiz	"\n[1]: Get a coffee \n[2]: Refuel storage \n[3]: Display amount by type \nSelect an option: "
+	actionOptions:	.asciiz	"\n[1]: Get a coffee \n[2]: Refill storage \n[3]: Display amount by type \nSelect an option: "
 	
 	drinkOptions:	.asciiz	"\n[1]: Pure coffee \n[2]: Coffee with milk \n[3]: Mochaccino \nSelect the drink: "
 	drinkSizes:	.asciiz "\n[1]: Small \n[2]: Big \nSelect size: "
 	isThereSugar: 	.asciiz "\n[1] Yes \n[2] No \nDo you want sugar? "
-	refuelOptions: 	.asciiz "\nRefuel"
+	refillOptions: 	.asciiz "\nRefil \n[1] Sugar \n[2] Pure Coffee \n[3] Milk \n[4] Chocolate \nSelect the storage: "
 	
 	errorMessage:		.asciiz "\nAn invalid type was selected, the system is restarting\n"
 	err_ThereIsntSugar: 	.asciiz "\nInsufficient sugar, please refill \n"
@@ -16,6 +16,9 @@
 	err_ThereIsntMilk:	.asciiz "\nInsufficient milk, please refill \n"
 	err_ThereIsntChocolate: .asciiz "\nInsufficient chocolate, please refill \n"
 	
+	success_filled:	.asciiz "\nSuccessfully filled out! \n"
+	preparing_word:	.asciiz "\nPreparing in "
+	seconds_word:	.asciiz " seconds\n"
 	sugar_word:	.asciiz "\nStorage: \nSugar: "
 	coffee_word:	.asciiz "\nCoffee: "
 	milk_word:	.asciiz "\nMilk: "
@@ -28,10 +31,10 @@ main:
 	bge	$v0, 4, HANDLE_ERROR
 	# $v0 ACTION TYPE ID
 	beq 	$v0, 1, GET_COFFEE
-	beq	$v0, 2, REFUEL
+	beq	$v0, 2, REFILL
 	beq	$v0, 3, DISPLAY_AMOUNT
 	
-	BACK_GET_COFFEE_OR_REFUEL:
+	BACK_GET_COFFEE_OR_REFILL:
 	j main
 
 GET_ACTION:
@@ -89,12 +92,12 @@ GET_COFFEE:
 	CHECK_SUGAR_AVAILABILITY:
 	beq	$a2, 2, CHECK_DRINK_TYPE_AVAILABILITY # if don't want sugar
 	
-	la	$t0, sugar
-	lw	$t0, ($t0) 	# $t0 storage - sugar amount
+	la	$s3, sugar
+	lw	$s3, ($s3)     	# $t0 storage - sugar amount
 	
-	mul	$s3, $a2, $a1  # $t1 - needed sugar amount
+	mul	$t1, $a2, $a1  	# $t1 - needed sugar amount
 
-	blt	$t0, $s3, HANDLE_THERE_ISNT_SUGAR_ERROR
+	blt	$s3, $t1, HANDLE_THERE_ISNT_SUGAR_ERROR
 
 	CHECK_DRINK_TYPE_AVAILABILITY:
 	la	$s0, coffee
@@ -115,38 +118,98 @@ GET_COFFEE:
 	CHECK_CHOCOLATE_AVAIBILITY:
 	blt	$s2, $a1, HANDLE_THERE_ISNT_CHOCOLATE_ERROR
 	beq	$a0, 3, PREPARE
+	
+	# $t9 === amt ref time
+	li	$t9, 0
 
 	PREPARE:
 	beq	$a2, 2, PREPARECOFFEE # if don't want sugar
-	# sugar === $s3
 	la	$t0, sugar
 	sub 	$s3, $s3, $a1
 	sw	$s3, ($t0)
+	add	$t9, $t9, $a1
 
 	PREPARECOFFEE:
 	la	$t0, coffee
 	sub	$s0, $s0, $a1
 	sw	$s0, ($t0)
+	add	$t9, $t9, $a1
 	beq	$a0, 1, PREPARE_OUT
 	PREPAREMILK:
 	la	$t0, milk
 	sub	$s1, $s1, $a1
 	sw	$s1, ($t0)
+	add	$t9, $t9, $a1
 	beq	$a0, 2, PREPARE_OUT
 	PREPARECHOCOLATE:
 	la	$t0, chocolate
 	sub	$s2, $s2, $a1
 	sw	$s2, ($t0)
+	add	$t9, $t9, $a1
 	beq	$a0, 3, PREPARE_OUT 
 	
 	PREPARE_OUT:
+	li	$t8, 5
+	mul	$t8, $a1, $t8
+	add	$t9, $t8, $t9
 	
-	j BACK_GET_COFFEE_OR_REFUEL
-REFUEL:
-	li	$v0, 4	
-	la 	$a0, refuelOptions
+	li	$v0, 4
+	la	$a0, preparing_word
 	syscall
-	j BACK_GET_COFFEE_OR_REFUEL
+	
+	li	$v0, 1
+	move	$a0, $t9
+	syscall
+
+	li	$v0, 4
+	la	$a0, seconds_word
+	syscall
+	j BACK_GET_COFFEE_OR_REFILL
+REFILL:
+	li	$v0, 4	
+	la 	$a0, refillOptions
+	syscall
+	
+	li	$v0, 5
+	syscall
+	ble	$v0, 0, HANDLE_ERROR
+	bge	$v0, 5, HANDLE_ERROR
+	
+	beq	$v0, 1, REFILL_SUGAR
+	beq	$v0, 2, REFILL_COFFEE
+	beq	$v0, 3, REFILL_MILK
+	beq	$v0, 4, REFILL_CHOCOLATE
+
+
+	REFILL_SUGAR:
+	la	$t0, sugar
+	li	$a0, 20
+	sw	$a0, ($t0)
+	j REFILL_GETOUT
+
+	REFILL_COFFEE:
+	la	$t0, coffee
+	li	$a0, 20
+	sw	$a0, ($t0)
+	j REFILL_GETOUT
+
+	REFILL_MILK:
+	la	$t0, milk
+	li	$a0, 20
+	sw	$a0, ($t0)
+	j REFILL_GETOUT
+
+	REFILL_CHOCOLATE:
+	la	$t0, chocolate
+	li	$a0, 20
+	sw	$a0, ($t0)
+	
+	REFILL_GETOUT:
+	li	$v0, 4
+	la	$a0, success_filled
+	syscall
+	
+	j BACK_GET_COFFEE_OR_REFILL
 
 HANDLE_ERROR:
 	li	$v0, 4
@@ -158,24 +221,24 @@ HANDLE_THERE_ISNT_SUGAR_ERROR:
 	li	$v0, 4
 	la 	$a0, err_ThereIsntSugar
 	syscall
-	j BACK_GET_COFFEE_OR_REFUEL
+	j BACK_GET_COFFEE_OR_REFILL
 
 HANDLE_THERE_ISNT_COFFEE_ERROR:
 	li	$v0, 4
 	la	$a0, err_ThereIsntCoffee
 	syscall
-	j BACK_GET_COFFEE_OR_REFUEL
+	j BACK_GET_COFFEE_OR_REFILL
 
 HANDLE_THERE_ISNT_MILK_ERROR:
 	li	$v0, 4
 	la 	$a0, err_ThereIsntMilk
 	syscall
-	j BACK_GET_COFFEE_OR_REFUEL
+	j BACK_GET_COFFEE_OR_REFILL
 HANDLE_THERE_ISNT_CHOCOLATE_ERROR:
 	li	$v0, 4
 	la	$a0, err_ThereIsntChocolate
 	syscall
-	j BACK_GET_COFFEE_OR_REFUEL
+	j BACK_GET_COFFEE_OR_REFILL
 DISPLAY_AMOUNT:
 	la	$s0, sugar
 	la	$s1, coffee
@@ -218,4 +281,4 @@ DISPLAY_AMOUNT:
 	la	$a0, breakline_word
 	syscall
 	
-	j BACK_GET_COFFEE_OR_REFUEL
+	j BACK_GET_COFFEE_OR_REFILL
